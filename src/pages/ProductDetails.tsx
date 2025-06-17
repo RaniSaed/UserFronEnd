@@ -1,28 +1,37 @@
+/// File path: src/pages/ProductDetails.tsx
+
 import React, { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/api";
-import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
-
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
 
 const ProductDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const { addToCart } = useCart();
   const { toast } = useToast();
   const [quantity, setQuantity] = useState(1);
-  const queryClient = useQueryClient();
+  const [buyer, setBuyer] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    country: "Israel",
+    city: "Tel Aviv",
+    paymentMethod: "cash",
+    cardNumber: "",
+    expiryMonth: "",
+    expiryYear: "",
+    cvv: "",
+  });
 
-  const {
-    data: product,
-    isLoading,
-    error,
-  } = useQuery({
+  const queryClient = useQueryClient();
+  const { data: product, isLoading, error } = useQuery({
     queryKey: ["product", id],
     queryFn: () => api.getProduct(Number(id)),
     enabled: !!id,
@@ -31,18 +40,13 @@ const ProductDetails: React.FC = () => {
   const { mutate: purchase } = useMutation({
     mutationFn: (qty: number) => api.purchaseProduct(Number(id), qty),
     onSuccess: () => {
-      toast({
-        title: "✅ Purchase Successful",
-        description: `${quantity} × ${product?.name} purchased successfully.`,
-      });
+      toast({ title: "✅ Purchase Successful" });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["product", id] });
+      generateReceipts();
     },
     onError: (err: any) => {
-      toast({
-        title: "❌ Purchase Failed",
-        description: err?.message || "Unexpected error occurred.",
-      });
+      toast({ title: "❌ Purchase Failed", description: err?.message });
     },
   });
 
@@ -52,120 +56,151 @@ const ProductDetails: React.FC = () => {
     }
   };
 
-  const isLowStock = product?.stock_level <= product?.low_stock_threshold;
-  const isOutOfStock = product?.stock_level === 0;
+  const generateReceipts = () => {
+    const workbook = XLSX.utils.book_new();
+    const data = [
+      ["Name", "Email", "Phone", "Product", "Category", "Quantity", "Unit Price", "Total", "Country", "City", "Payment"],
+      [
+        buyer.name,
+        buyer.email,
+        buyer.phone,
+        product?.name,
+        product?.category,
+        quantity,
+        product?.price,
+        product?.price * quantity,
+        buyer.country,
+        buyer.city,
+        buyer.paymentMethod === "visa"
+          ? `Visa **** **** **** ${buyer.cardNumber.slice(-4)}`
+          : "Cash",
+      ],
+    ];
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Receipt");
+    XLSX.writeFile(workbook, "purchase_receipt.xlsx");
 
-  if (isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-8 animate-pulse">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="aspect-square bg-gray-200 rounded-lg"></div>
-          <div className="space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-3/4"></div>
-            <div className="h-6 bg-gray-200 rounded w-1/2"></div>
-            <div className="h-4 bg-gray-200 rounded w-full"></div>
-            <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-          </div>
-        </div>
-      </div>
+    const pdf = new jsPDF();
+    pdf.setFontSize(18);
+    pdf.text("BIU Shop - Purchase Receipt", 20, 20);
+    pdf.setFontSize(12);
+    pdf.text(`Name: ${buyer.name}`, 20, 40);
+    pdf.text(`Email: ${buyer.email}`, 20, 50);
+    pdf.text(`Phone: ${buyer.phone}`, 20, 60);
+    pdf.text(`Product: ${product?.name}`, 20, 70);
+    pdf.text(`Category: ${product?.category}`, 20, 80);
+    pdf.text(`Quantity: ${quantity}`, 20, 90);
+    pdf.text(`Price Each: $${product?.price.toFixed(2)}`, 20, 100);
+    pdf.text(`Total: $${(product?.price * quantity).toFixed(2)}`, 20, 110);
+    pdf.text(`Shipping To: ${buyer.city}, ${buyer.country}`, 20, 120);
+    pdf.text("Arrival: Expected in 7–14 business days", 20, 130);
+    pdf.text(
+      `Payment: ${
+        buyer.paymentMethod === "visa"
+          ? `Visa **** **** **** ${buyer.cardNumber.slice(-4)}`
+          : "Cash"
+      }`,
+      20,
+      140
     );
-  }
+    pdf.text("\nThank you for shopping with BIU Shop!", 20, 160);
+    pdf.save("purchase_receipt.pdf");
+  };
 
-  if (error || !product) {
-    return (
-      <section className="container mx-auto px-4 py-16 text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Product Not Found</h2>
-        <p className="text-gray-600 mb-4">The product you're looking for doesn't exist.</p>
-        <Link to="/">
-          <Button variant="outline">Back to Products</Button>
-        </Link>
-      </section>
-    );
-  }
+  if (isLoading) return <p>Loading...</p>;
+  if (error || !product) return <p>Product not found</p>;
 
   return (
-    <section className="container mx-auto px-4 py-8">
-      <nav className="mb-6">
-        <Link to="/" className="text-sm text-blue-600 hover:underline">
-          ← Back to Products
-        </Link>
-      </nav>
+    <div className="container py-8">
+      <h1 className="text-3xl font-bold mb-4">{product.name}</h1>
+      <p className="text-muted-foreground mb-2">{product.category}</p>
+      <p className="text-2xl font-semibold mb-4">${product.price}</p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        {/* Product Image Placeholder */}
-        <div className="aspect-square bg-gray-100 rounded-lg flex items-center justify-center">
-          <span className="text-8xl text-gray-400">📦</span>
-        </div>
+      <div className="space-y-4 max-w-md">
+        <Label>Quantity</Label>
+        <Input
+          type="number"
+          value={quantity}
+          onChange={(e) => setQuantity(parseInt(e.target.value))}
+          min={1}
+          max={product.stock_level}
+        />
 
-        {/* Product Info */}
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold">{product.name}</h1>
-            <p className="text-sm text-muted-foreground mb-2">
-              {product.category} • SKU: {product.sku}
-            </p>
-            <p className="text-4xl font-bold">${product.price.toFixed(2)}</p>
-          </div>
+        <Label>Name</Label>
+        <Input
+          value={buyer.name}
+          onChange={(e) => setBuyer({ ...buyer, name: e.target.value })}
+        />
 
-          <div>
-            {isOutOfStock ? (
-              <Badge variant="destructive">Out of Stock</Badge>
-            ) : isLowStock ? (
-              <Badge variant="outline" className="text-orange-600 border-orange-600">
-                Low Stock ({product.stock_level} left)
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="text-green-600 border-green-600">
-                In Stock ({product.stock_level} available)
-              </Badge>
-            )}
-          </div>
+        <Label>Email</Label>
+        <Input
+          value={buyer.email}
+          onChange={(e) => setBuyer({ ...buyer, email: e.target.value })}
+        />
 
-          <Card>
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold mb-2">Description</h3>
-              <p className="text-gray-700">
-                {product.description || "No description available."}
-              </p>
-            </CardContent>
-          </Card>
+        <Label>Phone</Label>
+        <Input
+          value={buyer.phone}
+          onChange={(e) => setBuyer({ ...buyer, phone: e.target.value })}
+        />
 
-          {!isOutOfStock && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="quantity">Quantity</Label>
-                <Input
-                  id="quantity"
-                  type="number"
-                  min={1}
-                  max={product.stock_level}
-                  value={quantity}
-                  onChange={(e) =>
-                    setQuantity(
-                      Math.max(
-                        1,
-                        Math.min(product.stock_level, parseInt(e.target.value) || 1)
-                      )
-                    )
-                  }
-                  className="w-24 mt-1"
-                />
-              </div>
-
-              <Button
-                onClick={handlePurchase}
-                size="lg"
-                className="w-full"
-                disabled={quantity <= 0 || quantity > product.stock_level}
-              >
-                Buy {quantity} × ${product.price.toFixed(2)} = $
-                {(product.price * quantity).toFixed(2)}
-              </Button>
-            </div>
+        <Label>City</Label>
+        <select
+          className="border rounded p-2 w-full"
+          value={buyer.city}
+          onChange={(e) => setBuyer({ ...buyer, city: e.target.value })}
+        >
+          {["Tel Aviv", "Jerusalem", "Haifa", "Eilat", "Nazareth", "Ashdod", "Rishon LeZion", "Petah Tikva", "Netanya", "Beer Sheva"].map(
+            (city) => (
+              <option key={city} value={city}>
+                {city}
+              </option>
+            )
           )}
-        </div>
+        </select>
+
+        <Label>Payment Method</Label>
+        <select
+          className="border rounded p-2 w-full"
+          value={buyer.paymentMethod}
+          onChange={(e) => setBuyer({ ...buyer, paymentMethod: e.target.value })}
+        >
+          <option value="cash">Cash</option>
+          <option value="visa">Visa</option>
+        </select>
+
+        {buyer.paymentMethod === "visa" && (
+          <div className="space-y-2">
+            <Label>Card Number</Label>
+            <Input
+              maxLength={16}
+              value={buyer.cardNumber}
+              onChange={(e) => setBuyer({ ...buyer, cardNumber: e.target.value })}
+            />
+            <Label>Expiry (MM)</Label>
+            <Input
+              maxLength={2}
+              value={buyer.expiryMonth}
+              onChange={(e) => setBuyer({ ...buyer, expiryMonth: e.target.value })}
+            />
+            <Label>Expiry (YY)</Label>
+            <Input
+              maxLength={2}
+              value={buyer.expiryYear}
+              onChange={(e) => setBuyer({ ...buyer, expiryYear: e.target.value })}
+            />
+            <Label>CVV</Label>
+            <Input
+              maxLength={3}
+              value={buyer.cvv}
+              onChange={(e) => setBuyer({ ...buyer, cvv: e.target.value })}
+            />
+          </div>
+        )}
+
+        <Button onClick={handlePurchase}>Confirm Purchase</Button>
       </div>
-    </section>
+    </div>
   );
 };
 

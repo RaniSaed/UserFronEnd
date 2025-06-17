@@ -11,50 +11,56 @@ export interface Product {
   category: string;
 }
 
+const handleResponse = async (response: Response) => {
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    const message = errorBody?.error || `HTTP error! status: ${response.status}`;
+    throw new Error(message);
+  }
+  return response.json();
+};
+
 export const api = {
-  // שליפת כל המוצרים
+  /**
+   * שליפת כל המוצרים
+   */
   async getProducts(): Promise<Product[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/user/products`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      console.log('Fetched products:', data);
-      return data;
+      const res = await fetch(`${API_BASE_URL}/api/user/products`);
+      return await handleResponse(res);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('❌ Failed to fetch products:', error);
       throw error;
     }
   },
 
-  // שליפת מוצר לפי מזהה
+  /**
+   * שליפת מוצר לפי מזהה
+   */
   async getProduct(id: number): Promise<Product> {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/products/${id}`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      console.log('Fetched product:', data);
-      return data;
+      const res = await fetch(`${API_BASE_URL}/api/products/${id}`);
+      return await handleResponse(res);
     } catch (error) {
-      console.error('Error fetching product:', error);
+      console.error(`❌ Failed to fetch product [id=${id}]:`, error);
       throw error;
     }
   },
 
-  // רכישת מוצר לפי מזהה וכמות
+  /**
+   * רכישת מוצר לפי מזהה וכמות
+   */
   async purchaseProduct(productId: number, quantity: number): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/api/user/products/${productId}/purchase`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ quantity }),
-    });
-
-    if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error?.error || 'Purchase failed');
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/user/products/${productId}/purchase`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantity }),
+      });
+      await handleResponse(res);
+    } catch (error) {
+      console.error(`❌ Failed to purchase product [id=${productId}]:`, error);
+      throw error;
     }
-  }
+  },
 };

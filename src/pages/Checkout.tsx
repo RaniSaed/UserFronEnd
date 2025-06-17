@@ -1,48 +1,44 @@
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
+import { useCart } from "@/contexts/CartContext";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useCart } from '@/contexts/CartContext';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { useToast } from '@/hooks/use-toast';
-
-const Checkout = () => {
+const Checkout: React.FC = () => {
   const { items, total, getTotalItems, clearCart } = useCart();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [formData, setFormData] = useState({
-    email: '',
-    firstName: '',
-    lastName: '',
-    address: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    cardNumber: '',
-    expiryDate: '',
-    cvv: '',
+    email: "",
+    firstName: "",
+    lastName: "",
+    address: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    cardNumber: "",
+    expiryDate: "",
+    cvv: "",
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsProcessing(true);
 
-    // Simulate order processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((res) => setTimeout(res, 2000)); // Simulate request
 
     toast({
-      title: "Order Placed Successfully!",
+      title: "Order Placed Successfully 🎉",
       description: `Your order of ${getTotalItems()} items totaling $${total.toFixed(2)} has been placed.`,
     });
 
@@ -52,43 +48,43 @@ const Checkout = () => {
 
   if (items.length === 0) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Checkout</h1>
-          <p className="text-gray-600 mb-8">Your cart is empty</p>
-          <Link to="/">
-            <Button size="lg">Continue Shopping</Button>
-          </Link>
-        </div>
-      </div>
+      <section className="container mx-auto px-4 py-16 text-center">
+        <h1 className="text-3xl font-bold mb-4">Checkout</h1>
+        <p className="text-gray-600 mb-8">Your cart is empty.</p>
+        <Link to="/">
+          <Button size="lg">Continue Shopping</Button>
+        </Link>
+      </section>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Checkout</h1>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <section className="container mx-auto px-4 py-12">
+      <h1 className="text-3xl font-bold mb-8">Checkout</h1>
+
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Left: Form Fields */}
         <div className="space-y-6">
+          {/* Contact Info */}
           <Card>
             <CardHeader>
               <CardTitle>Contact Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  required
-                />
-              </div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                required
+              />
             </CardContent>
           </Card>
 
+          {/* Shipping */}
           <Card>
             <CardHeader>
               <CardTitle>Shipping Address</CardTitle>
@@ -116,6 +112,7 @@ const Checkout = () => {
                   />
                 </div>
               </div>
+
               <div>
                 <Label htmlFor="address">Address</Label>
                 <Input
@@ -126,6 +123,7 @@ const Checkout = () => {
                   required
                 />
               </div>
+
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="city">City</Label>
@@ -161,22 +159,22 @@ const Checkout = () => {
             </CardContent>
           </Card>
 
+          {/* Payment */}
           <Card>
             <CardHeader>
-              <CardTitle>Payment Information</CardTitle>
+              <CardTitle>Payment Details</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="cardNumber">Card Number</Label>
-                <Input
-                  id="cardNumber"
-                  name="cardNumber"
-                  placeholder="1234 5678 9012 3456"
-                  value={formData.cardNumber}
-                  onChange={handleInputChange}
-                  required
-                />
-              </div>
+              <Label htmlFor="cardNumber">Card Number</Label>
+              <Input
+                id="cardNumber"
+                name="cardNumber"
+                placeholder="1234 5678 9012 3456"
+                value={formData.cardNumber}
+                onChange={handleInputChange}
+                required
+              />
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="expiryDate">Expiry Date</Label>
@@ -205,64 +203,55 @@ const Checkout = () => {
           </Card>
         </div>
 
+        {/* Right: Summary */}
         <div>
           <Card className="sticky top-24">
             <CardHeader>
               <CardTitle>Order Summary</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-3">
-                {items.map((item) => (
-                  <div key={item.product.id} className="flex justify-between">
-                    <div className="flex-1">
-                      <p className="font-medium">{item.product.name}</p>
-                      <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
-                    </div>
-                    <p className="font-medium">${(item.product.price * item.quantity).toFixed(2)}</p>
+              {items.map((item) => (
+                <div key={item.product.id} className="flex justify-between">
+                  <div>
+                    <p className="font-medium">{item.product.name}</p>
+                    <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
                   </div>
-                ))}
-              </div>
-              
+                  <p>${(item.product.price * item.quantity).toFixed(2)}</p>
+                </div>
+              ))}
+
               <Separator />
-              
+
               <div className="flex justify-between">
                 <span>Subtotal</span>
                 <span>${total.toFixed(2)}</span>
               </div>
-              
               <div className="flex justify-between">
                 <span>Shipping</span>
                 <span>Free</span>
               </div>
-              
+
               <Separator />
-              
+
               <div className="flex justify-between font-bold text-lg">
                 <span>Total</span>
                 <span>${total.toFixed(2)}</span>
               </div>
-              
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <Button 
-                  type="submit" 
-                  size="lg" 
-                  className="w-full"
-                  disabled={isProcessing}
-                >
-                  {isProcessing ? "Processing..." : `Place Order - $${total.toFixed(2)}`}
-                </Button>
-              </form>
-              
-              <Link to="/cart" className="block w-full">
-                <Button variant="outline" size="lg" className="w-full">
+
+              <Button type="submit" size="lg" className="w-full" disabled={isProcessing}>
+                {isProcessing ? "Processing..." : `Place Order – $${total.toFixed(2)}`}
+              </Button>
+
+              <Link to="/cart">
+                <Button variant="outline" size="lg" className="w-full mt-2">
                   Back to Cart
                 </Button>
               </Link>
             </CardContent>
           </Card>
         </div>
-      </div>
-    </div>
+      </form>
+    </section>
   );
 };
 

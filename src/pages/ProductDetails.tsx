@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/api';
 import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
@@ -16,6 +15,7 @@ const ProductDetails = () => {
   const { addToCart } = useCart();
   const { toast } = useToast();
   const [quantity, setQuantity] = useState(1);
+  const queryClient = useQueryClient();
 
   const { data: product, isLoading, error } = useQuery({
     queryKey: ['product', id],
@@ -23,13 +23,28 @@ const ProductDetails = () => {
     enabled: !!id,
   });
 
-  const handleAddToCart = () => {
-    if (product && quantity > 0 && quantity <= product.stock_level) {
-      addToCart(product, quantity);
+  const { mutate: purchase } = useMutation({
+    mutationFn: (quantity: number) =>
+      api.purchaseProduct(Number(id), quantity),
+    onSuccess: () => {
       toast({
-        title: "Added to cart",
-        description: `${quantity} ${product.name}(s) added to your cart.`,
+        title: '✅ Purchase successful',
+        description: `${quantity} ${product?.name} purchased successfully.`,
       });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['product', id] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: '❌ Purchase failed',
+        description: error?.message || 'Unexpected error occurred',
+      });
+    },
+  });
+
+  const handlePurchase = () => {
+    if (product && quantity > 0 && quantity <= product.stock_level) {
+      purchase(quantity);
     }
   };
 
@@ -125,18 +140,25 @@ const ProductDetails = () => {
                   min="1"
                   max={product.stock_level}
                   value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, Math.min(product.stock_level, parseInt(e.target.value) || 1)))}
+                  onChange={(e) =>
+                    setQuantity(
+                      Math.max(
+                        1,
+                        Math.min(product.stock_level, parseInt(e.target.value) || 1)
+                      )
+                    )
+                  }
                   className="w-24 mt-1"
                 />
               </div>
 
-              <Button 
-                onClick={handleAddToCart}
+              <Button
+                onClick={handlePurchase}
                 size="lg"
                 className="w-full"
                 disabled={quantity <= 0 || quantity > product.stock_level}
               >
-                Add {quantity} to Cart - ${(product.price * quantity).toFixed(2)}
+                Buy {quantity} – ${(product.price * quantity).toFixed(2)}
               </Button>
             </div>
           )}
